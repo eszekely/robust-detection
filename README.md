@@ -1,6 +1,6 @@
-# Robust detection and attribution
+# Distributionally-robust detection of external forcings under climate interventions
 
-RobustDA is a Python package for testing detection and attribution of climate change.
+Robust-detection is a Python package for testing detection of climate change.
 
 ## Installation
 
