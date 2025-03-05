@@ -3,7 +3,7 @@ import numpy as np
 import os
 import pandas as pd
 
-dirFiles = "./../data/models/CMIP6/"
+dirFiles = "./../data/models/"
 
 
 class ClimateModelData:
