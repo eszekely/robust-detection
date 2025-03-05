@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import pickle
 import os
+import scipy
 
 from copy import deepcopy
 from sklearn.preprocessing import StandardScaler
@@ -77,7 +78,7 @@ def build_column_space(y_anchor, h_anchors):
                 y_anchor, h_anchors[i]
             ).reshape(-1)
 
-    A_h = np.mat(A_h)  # needed for matrix multiplication
+    # A_h = np.mat(A_h)  # needed for matrix multiplication
     #     PA = A_h * np.linalg.inv(np.transpose(A_h) * A_h) * np.transpose(A_h)
     A_h = np.mat(
         StandardScaler(with_mean=True, with_std=False).fit_transform(A_h)
@@ -90,13 +91,18 @@ def build_column_space(y_anchor, h_anchors):
 def projection_column_space(X, y, gamma, PA):
     N = X.shape[0]
 
-    X_PA = (np.mat(np.identity(N)) - PA) * np.mat(X) + np.sqrt(
+    # Standard AR method
+    X_PA = np.asarray((np.mat(np.identity(N)) - PA) * np.mat(X) + np.sqrt(
         gamma
-    ) * PA * np.mat(X)
+    ) * PA * np.mat(X))
 
-    y_PA = (np.mat(np.identity(N)) - PA) * np.mat(y) + np.sqrt(
+    y_PA = np.asarray((np.mat(np.identity(N)) - PA) * np.mat(y) + np.sqrt(
         gamma
-    ) * PA * np.mat(y)
+    ) * PA * np.mat(y))
+
+    # # Using only the anchor projection PA term
+    # X_PA = PA * np.mat(X)
+    # y_PA = PA * np.mat(y)
 
     return X_PA, y_PA
 
@@ -853,6 +859,7 @@ def cross_validation_gamma_lambda(
 ):
 
     nb_folds_CV = 3
+    solver = 'auto'
 
     """ LOOCV """
     #     uniqueTrain = set(
@@ -998,6 +1005,9 @@ def cross_validation_gamma_lambda(
 
         for i in range(len(gamma_vals)):
 
+            #########################
+            print(f"Gamma: {gamma_vals[i]}")
+            
             """ Linear anchor """
             X_PA, y_PA = transformed_anchor_matrices(
                 X_train_std,
@@ -1011,8 +1021,12 @@ def cross_validation_gamma_lambda(
             N_val = PA_val.shape[0]
 
             for j in range(len(lambda_vals)):
+                
+                #########################
+                print(f"Lambda: {lambda_vals[j]}")
+
                 # No intercept needed, X and y are centered and so are X_PA and y_PA
-                regr = linear_model.Ridge(alpha=lambda_vals[j])
+                regr = linear_model.Ridge(alpha=lambda_vals[j], solver=solver)
                 regr.fit(X_PA, y_PA)
 
                 coef_std = regr.coef_
@@ -1079,7 +1093,7 @@ def cross_validation_gamma_lambda(
             N_val = PA_val_nonlin.shape[0]
 
             for j in range(len(lambda_vals)):
-                regr = linear_model.Ridge(alpha=lambda_vals[j])
+                regr = linear_model.Ridge(alpha=lambda_vals[j], solver=solver)
                 regr.fit(X_PA, y_PA)
 
                 coef_std = regr.coef_

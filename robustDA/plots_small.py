@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
+import pickle
 import cartopy.crs as ccrs
 import matplotlib.transforms as mtransforms
 
@@ -17,13 +18,14 @@ from robustDA.utils.helpers import truncate, display_nonlinear_anchors
 
 params = {
     "text.usetex": True,
-    "text.latex.preamble": r"\usepackage{amsmath}",
+    #"text.latex.preamble": r"\usepackage{amsmath}",
     "axes.labelsize": 18,
     "axes.titlesize": 18,
     "xtick.labelsize": 14,
     "ytick.labelsize": 14,
     "xtick.minor.size": 0,
     "xtick.minor.width": 0,
+    "legend.fontsize": 13,
 }
 plt.rcParams.update(params)
 
@@ -954,33 +956,33 @@ def plot_maps(
         
         
 def plot_residuals(
-    y_test_true,
-    y_test_pred,
-    y_test_pred_ridge,
-    y_anchor_test,
+    y_true,
+    y_pred,
+    y_anchor,
     target,
     anchor,
     h_anchors,
-    rmse,
-    rmse_PA,
-    corr,
-    mi,
-    gamma_vals,
-    lambda_vals,
-    ind_gamma_opt,
-    ind_lambda_opt,
-    ind_lambda_opt_ridge,
-    ind_vect_ideal_obj1,
-    ind_vect_ideal_obj2,
-    filename=None,
+    # rmse,
+    # rmse_PA,
+    # corr,
+    # mi,
+    # gamma_vals,
+    # lambda_vals,
+    # ind_gamma_opt,
+    # ind_lambda_opt,
+    # ind_lambda_opt_ridge,
+    # ind_vect_ideal_obj1,
+    # ind_vect_ideal_obj2,
+    #filename=None,
+    ax,
 ):
 
     grid = (72, 144)
 
-    rmse_bagging = np.mean(rmse, axis=0)
-    rmse_PA_bagging = np.mean(rmse_PA, axis=0)
-    corr_bagging = np.mean(corr, axis=0)
-    mi_bagging = np.mean(mi, axis=0)
+    # rmse_bagging = np.mean(rmse, axis=0)
+    # rmse_PA_bagging = np.mean(rmse_PA, axis=0)
+    # corr_bagging = np.mean(corr, axis=0)
+    # mi_bagging = np.mean(mi, axis=0)
 
     """ Evaluation measures (anchor) """
     rmse_av = 0
@@ -990,81 +992,99 @@ def plot_residuals(
     corr3_av = 0
     mi_av = 0
     
-    for i in range(len(y_test_true)):
-        res = np.array(y_test_true[i]).reshape(-1, 1) - np.array(
-            y_test_pred[i]
+    for i in range(len(y_true)):
+        res = np.array(y_true[i]).reshape(-1, 1) - np.array(
+            y_pred[i]
         ).reshape(-1, 1)
         rmse_av = rmse_av + np.sqrt(np.mean(res ** 2))
         r2_av = r2_av + r2_score(
-            np.array(y_test_true[i]).reshape(-1, 1),
-            np.array(y_test_pred[i]).reshape(-1, 1),
+            np.array(y_true[i]).reshape(-1, 1),
+            np.array(y_pred[i]).reshape(-1, 1),
         )
         corr_av = (
             corr_av
             + np.corrcoef(
-                np.array(y_anchor_test[i]).reshape(1, -1), res.reshape(1, -1)
+                np.array(y_anchor[i]).reshape(1, -1), res.reshape(1, -1)
             )[0, 1]
         )
         mi_av = (
             mi_av
             + mutual_info_regression(
-                np.array(y_anchor_test[i]).reshape(-1, 1), res.reshape(-1)
+                np.array(y_anchor[i]).reshape(-1, 1), res.reshape(-1)
             )[0]
         )
         if len(h_anchors) == 1:
             corr2_av = corr2_av + np.corrcoef(
-                np.array(y_anchor_test[i]).reshape(1, -1) ** 2,
+                np.array(y_anchor[i]).reshape(1, -1) ** 2,
                 res.reshape(1, -1),
             )[0, 1]
         elif len(h_anchors) == 2:
             corr3_av = corr3_av + np.corrcoef(
-                np.abs(np.array(y_anchor_test[i]).reshape(1, -1)),
+                np.abs(np.array(y_anchor[i]).reshape(1, -1)),
                 res.reshape(1, -1),
             )[0, 1]
-    rmse_av = rmse_av / (len(y_test_true))
-    r2_av = r2_av / len(y_test_true)
-    corr_av = corr_av / len(y_test_true)
-    corr2_av = corr2_av / len(y_test_true)
-    corr3_av = corr3_av / len(y_test_true)
-    mi_av = mi_av / len(y_test_true)
+    rmse_av = rmse_av / (len(y_true))
+    r2_av = r2_av / len(y_true)
+    corr_av = corr_av / len(y_true)
+    corr2_av = corr2_av / len(y_true)
+    corr3_av = corr3_av / len(y_true)
+    mi_av = mi_av / len(y_true)
+    # print(f'RMSE = {rmse_av}')
+    # print(f'Corr = {corr_av}')
+    # print(f'MI = {mi_av}')
 
     """ ############################ """
     """       Plotting started       """
     """ ############################ """
-    yt = np.array(list(flatten(y_test_true))).reshape(-1, 1)
-    yp = np.array(list(flatten(y_test_pred))).reshape(-1, 1)
-    yp_ridge = np.array(list(flatten(y_test_pred_ridge))).reshape(-1, 1)
-    ya = np.array(list(flatten(y_anchor_test))).reshape(-1, 1)
+    yt = np.array(list(flatten(y_true))).reshape(-1, 1)
+    yp = np.array(list(flatten(y_pred))).reshape(-1, 1)
+    ya = np.array(list(flatten(y_anchor))).reshape(-1, 1)
     residuals = (yt - yp).reshape(-1)
-    residuals_ridge = (yt - yp_ridge).reshape(-1)
-
-    fig, (ax1) = plt.subplots(1, 1, figsize=(6, 3))
+    
+    # fig, (ax1) = plt.subplots(1, 1, figsize=(6, 3))
 
     """ Residuals """
-    ax1.plot(ya, residuals, ".", color="peru", markersize=3, rasterized=True)
-    if anchor[:3] == "co2":
-        ax1.set_xlabel(
+    ax.plot(ya, residuals, ".", color="peru", markersize=3, rasterized=True)
+    b, a = np.polyfit(ya.reshape(-1), residuals.reshape(-1), deg=1)
+    
+    # Create sequence of 100 numbers from 0 to 100 
+    xseq = np.linspace(min(ya.reshape(-1)), max(ya.reshape(-1)), num=100)
+    
+    # Plot regression line
+    ax.plot(xseq, a + b * xseq, color="k", lw=1);
+    
+    if target == 'GHG': 
+        ax.set_ylim([-2.1, 2.5])
+        x_text, y_text = -1.47, 2 
+    elif target == 'aerosols':
+        ax.set_ylim([-2, 2])
+        x_text, y_text = 0, 1.5
+    
+    if anchor == "co2":
+        ax.set_xlabel(
             "Anchor $A$ (CO$_2$)",
             fontsize=params["axes.labelsize"],
         )
     else:
-        ax1.set_xlabel(
+        ax.set_xlabel(
             "Anchor $A$ (" + anchor[:3].upper() + ")",
             fontsize=params["axes.labelsize"],
         )
 
-    ax1.set_ylabel(
+    ax.set_ylabel(
         "Residuals (" + target[:3].upper() + ")",
         fontsize=params["axes.labelsize"],
     )
 #    if len(h_anchors) == 0:
-    ax1.set_title(
-        r"Correlation \& dependence: "
-        + "$\\rho (A)$ = "
-        + str(np.round(corr_av, 2))
-        + ", $I$ = "
-        + str(np.round(mi_av, 2)),
-        fontsize=params["axes.titlesize"],
+    
+    ax.text(x_text, y_text,
+        r"$RMSE$ = "
+            + str (np.round(rmse_av, 2))
+            + ", $\\rho (A)$ = "
+            + str(np.round(corr_av, 2))
+            + ", $I$ = "
+            + str(np.round(mi_av, 2)),
+            fontsize=params["axes.titlesize"]-4,
     )
 
     # elif len(h_anchors) == 1:
@@ -1100,11 +1120,13 @@ def plot_residuals(
     #     )
     plt.subplots_adjust(wspace=5, hspace=0.4)
 
-    if filename:
-        if not os.path.isdir("./../output/figures/"):
-            os.makedirs("./../output/figures/")
-        fig.savefig("./../output/figures/" + filename, bbox_inches="tight")
-        
+    # if filename:
+    #     if not os.path.isdir("./../output/figures/"):
+    #         os.makedirs("./../output/figures/")
+    #     fig.savefig("./../output/figures/" + filename, bbox_inches="tight")
+
+    return ax
+    
         
 def plot_residuals_ridge(
     y_test_true,
@@ -1130,10 +1152,10 @@ def plot_residuals_ridge(
 
     grid = (72, 144)
 
-    rmse_bagging = np.mean(rmse, axis=0)
-    rmse_PA_bagging = np.mean(rmse_PA, axis=0)
-    corr_bagging = np.mean(corr, axis=0)
-    mi_bagging = np.mean(mi, axis=0)
+    # rmse_bagging = np.mean(rmse, axis=0)
+    # rmse_PA_bagging = np.mean(rmse_PA, axis=0)
+    # corr_bagging = np.mean(corr, axis=0)
+    # mi_bagging = np.mean(mi, axis=0)
 
 
     """ Evaluation measures (anchor) """
@@ -1260,6 +1282,30 @@ def plot_residuals_ridge(
         fig.savefig("./../output/figures/" + filename, bbox_inches="tight")
     
 
+def plot_optimal_hyperparameters(gamma_opt, lambda_opt, title, filename):
+
+    fig = plt.figure(figsize=(5,4.7))
+    plt.plot(gamma_opt, lambda_opt, 'b.')
+
+    most_common_gamma = int(mode(list(gamma_opt.reshape(-1))))
+    most_common_lambda = int(mode(list(lambda_opt.reshape(-1))))
+    
+    plt.plot(most_common_gamma, most_common_lambda, 'ko', label = 'Most common optimal values for ($\\gamma$, $\\lambda$)')
+    plt.legend(fontsize = 13)
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.xlim(1, 1000000)
+    plt.ylim(1, 1000000000)
+    plt.xlabel('Intervention strength hyperparameter $\\gamma$', fontsize=14)
+    plt.ylabel('Ridge regularization hyperparameter $\\lambda$', fontsize=14);
+    plt.title(title, fontsize=16, y=1.03)
+    
+    if filename:
+            if not os.path.isdir("./../output/figures/"):
+                os.makedirs("./../output/figures/")
+            fig.savefig("./../output/figures/" + filename, bbox_inches="tight")
+
+
 def plot_Pareto(
     rmse,
     rmse_PA,
@@ -1376,7 +1422,7 @@ def plot_Pareto(
         fontsize=params["axes.labelsize"],
     )
     ax1.set_ylabel(
-        "$RMSE_{\Pi_{\mathbf{A}}}$ (error explained by $A$)",
+        r"$RMSE_{\Pi_{\mathbf{A}}}$ (error explained by $A$)",
         fontsize=params["axes.labelsize"],
     )
     
@@ -1407,6 +1453,9 @@ def plot_Pareto(
             "ko",
             markersize=7,
         )
+
+        # print(corr_bagging[i1, i2])
+        
         ax2.plot(
             rmse_bagging[0, i2_ridge],
             corr_bagging[0, i2_ridge],
@@ -2417,28 +2466,29 @@ def plot_all_v2(
     for i in range(rmse_bagging.shape[0]):
 
         gamma_exponent = np.log10(gamma_vals[i])
- 
+        
         if gamma_exponent.is_integer():
             if gamma_exponent == 0 or gamma_exponent == 1: # if gamma=1 or gamma=10
                 (line,) = ax.plot(
                     rmse_bagging[i, :],
                     rmse_PA_bagging[i, :],
                     ".-",
-                    label="$\\gamma = {}$ ".format(gamma_vals[i]),
+                    label=f"$\\gamma = {gamma_vals[i]}$ ",
                 )
             elif gamma_exponent > 1:
+                gamma_exponent = int(gamma_exponent)
                 (line,) = ax.plot(
                     rmse_bagging[i, :],
                     rmse_PA_bagging[i, :],
                     ".-",
-                    label="$\\gamma = 10^{}$ ".format(int(gamma_exponent)),
+                    label=f"$\\gamma = 10^{{{gamma_exponent}}}$",
                 )
         else:
             (line,) = ax.plot(
                 rmse_bagging[i, :],
                 rmse_PA_bagging[i, :],
                 ".-",
-                label="$\\gamma = {}$ ".format(gamma_vals[i]),
+                label=f"$\\gamma = {gamma_vals[i]}$ ",
             )
                 
         ax.plot(
@@ -2448,6 +2498,7 @@ def plot_all_v2(
             marker="o",
             markersize=8,
         )
+        
     # plot ideal vector
     #     if len(h_anchors) == 0:
     
@@ -2494,11 +2545,11 @@ def plot_all_v2(
         fontsize=params["axes.labelsize"],
     )
     ax.set_ylabel(
-        "$RMSE_{\Pi_{\mathbf{A}}}$ (error explained by $A$)",
+        r"$RMSE_{\Pi_{\mathbf{A}}}$ (error explained by $A$)",
         fontsize=params["axes.labelsize"],
     )
 
-    legend1 = ax.legend(fontsize=params["axes.labelsize"] - 2, loc = "upper right")
+    legend1 = ax.legend(fontsize=params["legend.fontsize"], loc = "upper right")
     legend2 = ax.legend([ideal_vector,ridge_optimal, anchor_optimal],['Ideal vector','Ridge (optimal)', 'Anchor (optimal)'], loc='upper left', fontsize=params["axes.labelsize"] - 2)
     ax.add_artist(legend1)
 
@@ -2526,6 +2577,7 @@ def plot_all_v2(
             "ko",
             markersize=7,
         )
+        # print(corr_bagging[i1, i2])
         ax.plot(
             rmse_bagging[0, i2_ridge],
             corr_bagging[0, i2_ridge],
@@ -2806,6 +2858,104 @@ def plot_Pareto_corr(
         if not os.path.isdir("./../output/figures/"):
             os.makedirs("./../output/figures/")
         fig.savefig("./../output/figures/" + filename, bbox_inches="tight")
+
+
+def plot_difference_maps(formatFig, filename: str = None):
+    fig = plt.figure(figsize=(14, 10))
+    spec = gridspec.GridSpec(nrows=2, ncols=2)
+    grid = (72, 144)
+    
+    # GHG with aerosols anchor
+    file = ("./../output/data/HT_GHG_aerosols_square_B50_CV3_spearman95_coefRaw_valPA_lsqr.pkl")
+    
+    with open(file, 'rb') as f:
+        params_climate, params_anchor, lambda_vals, y_train_true, y_anchor_train, y_test_true, y_anchor_test, \
+        ind_gamma_opt_lin, ind_lambda_opt_lin, ind_lambda_opt_ridge_lin, gamma_opt_lin, lambda_opt_lin, lambda_opt_ridge_lin, \
+        ind_vect_ideal_obj1_lin, ind_vect_ideal_obj2_lin, \
+        coef_raw_opt_lin, coef_raw_opt_ridge_lin, \
+        y_train_pred_lin, y_train_pred_ridge_lin, \
+        y_test_pred_lin, y_test_pred_ridge_lin, \
+        rmse_train_lin, rmse_PA_train_lin, corr_train_lin, mi_train_lin, rmse_test_lin, rmse_PA_test_lin, corr_test_lin, mi_test_lin, \
+        alpha_bagging_lin, power_bagging_lin, \
+        ind_gamma_opt_nonlin, ind_lambda_opt_nonlin, ind_lambda_opt_ridge_nonlin, gamma_opt_nonlin, lambda_opt_nonlin, lambda_opt_ridge_nonlin, \
+        ind_vect_ideal_obj1_nonlin, ind_vect_ideal_obj2_nonlin, \
+        coef_raw_opt_nonlin, coef_raw_opt_ridge_nonlin, \
+        y_train_pred_nonlin, y_train_pred_ridge_nonlin, \
+        y_test_pred_nonlin, y_test_pred_ridge_nonlin, \
+        rmse_train_nonlin, rmse_PA_train_nonlin, corr_train_nonlin, corr2_train_nonlin, mi_train_nonlin, \
+        rmse_test_nonlin, rmse_PA_test_nonlin, corr_test_nonlin, corr2_test_nonlin, mi_test_nonlin, \
+        alpha_bagging_nonlin, power_bagging_nonlin, \
+        nb_models_bagging, models, modelsInfoFrame = pickle.load(f)
+        
+    # Linear
+    diff_maps = np.mean(coef_raw_opt_lin, axis = 0) - np.mean(coef_raw_opt_ridge_lin, axis = 0)
+    ax = fig.add_subplot(spec[0, 0], projection=ccrs.Robinson(central_longitude=180))
+    title = "GHG with aerosols anchor (linear)"
+    plotMapCartopy_subplots(
+        fig, ax, diff_maps.reshape(grid), cLim=0.005, dx=0.03, dy=0.03, title_subplot=title
+    )
+    label_panel(ax, "A")
+    
+    # Nonlinear
+    diff_maps = np.mean(coef_raw_opt_nonlin, axis = 0) - np.mean(coef_raw_opt_ridge_nonlin, axis = 0)
+    ax = fig.add_subplot(spec[0, 1], projection=ccrs.Robinson(central_longitude=180))
+    title = "GHG with aerosols anchor (nonlinear)"
+    plotMapCartopy_subplots(
+        fig, ax, diff_maps.reshape(grid), cLim=0.005, dx=0.03, dy=0.03, title_subplot=title
+    )
+    label_panel(ax, "B")
+    
+    # Aerosols with CO2 anchor
+    file = ("./../output/data/HT_aerosols_co2_square_B50_CV3_spearman95_coefRaw_valPA_lsqr.pkl")
+    
+    with open(file, 'rb') as f:
+        params_climate, params_anchor, lambda_vals, y_train_true, y_anchor_train, y_test_true, y_anchor_test, \
+        ind_gamma_opt_lin, ind_lambda_opt_lin, ind_lambda_opt_ridge_lin, gamma_opt_lin, lambda_opt_lin, lambda_opt_ridge_lin, \
+        ind_vect_ideal_obj1_lin, ind_vect_ideal_obj2_lin, \
+        coef_raw_opt_lin, coef_raw_opt_ridge_lin, \
+        y_train_pred_lin, y_train_pred_ridge_lin, \
+        y_test_pred_lin, y_test_pred_ridge_lin, \
+        rmse_train_lin, rmse_PA_train_lin, corr_train_lin, mi_train_lin, rmse_test_lin, rmse_PA_test_lin, corr_test_lin, mi_test_lin, \
+        alpha_bagging_lin, power_bagging_lin, \
+        ind_gamma_opt_nonlin, ind_lambda_opt_nonlin, ind_lambda_opt_ridge_nonlin, gamma_opt_nonlin, lambda_opt_nonlin, lambda_opt_ridge_nonlin, \
+        ind_vect_ideal_obj1_nonlin, ind_vect_ideal_obj2_nonlin, \
+        coef_raw_opt_nonlin, coef_raw_opt_ridge_nonlin, \
+        y_train_pred_nonlin, y_train_pred_ridge_nonlin, \
+        y_test_pred_nonlin, y_test_pred_ridge_nonlin, \
+        rmse_train_nonlin, rmse_PA_train_nonlin, corr_train_nonlin, corr2_train_nonlin, mi_train_nonlin, \
+        rmse_test_nonlin, rmse_PA_test_nonlin, corr_test_nonlin, corr2_test_nonlin, mi_test_nonlin, \
+        alpha_bagging_nonlin, power_bagging_nonlin, \
+        nb_models_bagging, models, modelsInfoFrame = pickle.load(f)
+    
+    # Linear
+    diff_maps = np.mean(coef_raw_opt_lin, axis = 0) - np.mean(coef_raw_opt_ridge_lin, axis = 0)
+    ax = fig.add_subplot(spec[1, 0], projection=ccrs.Robinson(central_longitude=180))
+    title = "Aerosols with CO$_2$ anchor (linear)"
+    plotMapCartopy_subplots(
+        fig, ax, diff_maps.reshape(grid), cLim=0.005, dx=0.03, dy=0.03, title_subplot=title
+    )
+    label_panel(ax, "C")
+    
+    
+    # Nonlinear
+    diff_maps = np.mean(coef_raw_opt_nonlin, axis = 0) - np.mean(coef_raw_opt_ridge_nonlin, axis = 0)
+    ax = fig.add_subplot(spec[1, 1], projection=ccrs.Robinson(central_longitude=180))
+    title = "Aerosols with CO$_2$ anchor (nonlinear)"
+    plotMapCartopy_subplots(
+        fig, ax, diff_maps.reshape(grid), cLim=0.005, dx=0.03, dy=0.03, title_subplot=title
+    )
+    label_panel(ax, "D")
+
+    # plt.subplots_adjust(wspace=5, hspace=2)
+
+    if filename:
+        if not os.path.isdir("./../output/figures/"):
+            os.makedirs("./../output/figures/")
+        fig.savefig(
+            "./../output/figures/" + filename,
+            bbox_inches="tight",
+            format=formatFig,
+        )
 
 
 def label_panel(

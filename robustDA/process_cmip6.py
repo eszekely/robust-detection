@@ -3,8 +3,7 @@ import numpy as np
 import os
 import pandas as pd
 
-dirFiles = "/net/ch4/data/cmip6-Next_Generation/tas/ann/g025/"
-# dirFiles = "./../data/mount/CMIP6/"
+dirFiles = "./../data/models/CMIP6/"
 
 
 class ClimateModelData:
@@ -104,12 +103,13 @@ def read_files_cmip6(params_climate, norm=True):
 
                         elif scen == "piControl":
                             if temp_ncdata.shape[0] >= (endDate - startDate):
-                                dates = pd.core.indexes.numeric.Int64Index(
+                                dates = pd.Index(
                                     np.linspace(
                                         startDate,
                                         endDate,
                                         endDate - startDate + 1,
-                                    )
+                                    ),
+                                    dtype=np.int64
                                 )
                                 temp_ncdata_df = pd.DataFrame(
                                     temp_ncdata[
@@ -211,14 +211,19 @@ def read_forcing_cmip6(scenario, forcing, startDate, endDate):
 
         if forcing == "total":
             radforcing_df = radforcing_df["total"]
+            radforcing_df.name = None
         elif forcing == "total_anthropogenic":
             radforcing_df = radforcing_df["total_anthropogenic"]
+            radforcing_df.name = None
         elif forcing == "volcanic":
             radforcing_df = radforcing_df["volcanic"]
+            radforcing_df.name = None
         elif forcing == "solar":
             radforcing_df = radforcing_df["solar"]
+            radforcing_df.name = None
         elif forcing == "total_natural":
             radforcing_df = radforcing_df["total_natural"]
+            radforcing_df.name = None
         elif forcing == "GHG":
             radforcing_df = (
                 radforcing_df["co2"]
@@ -227,6 +232,7 @@ def read_forcing_cmip6(scenario, forcing, startDate, endDate):
             )
         elif forcing == "co2":
             radforcing_df = radforcing_df["co2"]
+            radforcing_df.name = None
         elif forcing == "aerosols":
             radforcing_df = (
                 radforcing_df["aerosol-cloud_interactions"]
