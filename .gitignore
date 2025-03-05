@@ -1,8 +1,6 @@
 # exclude mounted files and output files
-/data/mount
 */__pycache__/*.pyc
 *.pyc
-*.egg-info/
 .ipynb_checkpoints
 *.egg
 **/.DS_Store
