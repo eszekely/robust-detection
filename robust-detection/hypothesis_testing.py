@@ -555,7 +555,7 @@ def test_DA_per_bag(params_climate, models, dict_models, y_test_pred):
                 if (
                     test_model_ts_vals[k]
                     > ts_null_mean
-                    + 1.96 * ts_null_std  # 1.96 (95%) or 2.326 (98%)
+                    + 1.96 * ts_null_std  # 1.96 for a two-tailed test (95% confidence level)
                     or test_model_ts_vals[k]
                     < ts_null_mean - 1.96 * ts_null_std
                 ):
